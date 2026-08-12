@@ -1,0 +1,1 @@
+"""SecurePy AI scanner package."""

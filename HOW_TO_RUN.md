@@ -25,37 +25,102 @@ Activate the pre-configured `.venv` environment:
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
-### Step 3: Run the Scanner
+---
 
-#### Scan a Single Python File
+## 🔍 Scanning
+
+### Scan a Single Python File
 ```powershell
 python -m securepy_ai.cli scan examples/vulnerable.py
 ```
 
-#### Scan an Entire Folder / Codebase
+### Scan an Entire Folder / Codebase
 ```powershell
 python -m securepy_ai.cli scan securepy_ai/
 ```
 
-#### Check Package Version
+### Show Extracted Security Context (Phase 3+)
+Displays rich context (data flow, source/sink, imports, variables) for each finding:
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --context
+```
+
+### Check Package Version
 ```powershell
 python -m securepy_ai.cli --version
 ```
 
 ---
 
+## 🤖 AI Patch Generation (Phase 4)
+
+SecurePy AI can generate fix candidates for detected vulnerabilities using a local LLM.
+
+### Option A — Mock LLM (No Ollama required, great for testing)
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm
+```
+
+### Option B — Real Local LLM via Ollama
+
+First, make sure [Ollama](https://ollama.com/download) is installed and running, then pull a model:
+```powershell
+ollama pull codellama:13b
+# or a lighter option:
+ollama pull deepseek-coder:6.7b
+# or:
+ollama pull qwen2.5-coder:7b
+```
+
+Then scan with fix mode:
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --model codellama:13b
+```
+
+### Useful `--fix` Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--fix` | off | Enable AI patch generation |
+| `--mock-llm` | off | Use mock LLM (no Ollama needed) |
+| `--model` | `codellama:13b` | Ollama model to use |
+| `--ollama-url` | `http://127.0.0.1:11434` | Ollama server URL |
+| `--timeout` | `180` | Request timeout in seconds |
+| `--max-patches` | `3` | Max number of patches to generate |
+
+### Example — Scan with context + 1 real patch
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --model codellama:13b --max-patches 1 --context
+```
+
+---
+
 ## 🧪 Running Automated Tests
 
-Run the full `pytest` test suite to verify scanner rules and logic:
+### Run All Tests
 ```powershell
 pytest tests/ -v
 ```
 
-Expected output:
+Expected output (25 tests):
 ```text
-tests/test_scanner.py::test_detect_hardcoded_secret PASSED               [ 33%]
-tests/test_scanner.py::test_ignore_normal_variable PASSED                [ 66%]
-tests/test_scanner.py::test_scan_directory PASSED                        [100%]
+tests/test_context.py::test_sql_injection_context PASSED
+tests/test_context.py::test_command_injection_context PASSED
+tests/test_context.py::test_hardcoded_secret_context PASSED
+tests/test_context.py::test_context_contains_surrounding_lines PASSED
+tests/test_context.py::test_context_contains_cwe_guidance PASSED
+tests/test_llm.py::test_extract_python_code_from_markdown PASSED
+tests/test_llm.py::test_extract_invalid_python_code PASSED
+tests/test_llm.py::test_patch_generator_with_mock_llm PASSED
+tests/test_llm.py::test_prompt_contains_finding_details PASSED
+tests/test_llm.py::test_prompt_includes_code_to_fix PASSED
+tests/test_rules.py::... (10 tests) PASSED
+tests/test_scanner.py::... (3 tests) PASSED
+```
+
+### Run Only Phase 4 LLM Tests
+```powershell
+pytest tests/test_llm.py -v
 ```
 
 ---
@@ -85,3 +150,7 @@ py -m securepy_ai.cli scan examples/vulnerable.py
 ### Error: `ModuleNotFoundError: No module named 'securepy_ai'`
 **Cause**: The command was executed outside the root project folder.  
 **Fix**: Ensure your working directory contains `securepy_ai/` and run `python -m securepy_ai.cli ...`.
+
+### Error: `Ollama is not reachable`
+**Cause**: Ollama server is not running.  
+**Fix**: Start Ollama, or use `--mock-llm` for offline testing.

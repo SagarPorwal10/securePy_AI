@@ -16,8 +16,7 @@ class VulnerabilityContext:
     """
     Rich security context extracted for a vulnerability finding.
 
-    This context will later be used to build high-quality prompts
-    for the local LLM remediation engine.
+    This context is used to build high-quality prompts for the LLM.
     """
 
     file_path: str
@@ -34,11 +33,14 @@ class VulnerabilityContext:
 
     def to_prompt_context(self) -> str:
         """
-        Converts the context into a structured text format suitable
-        for an LLM prompt.
+        Converts the context into structured text for an LLM prompt.
         """
         imports_text = "\n".join(self.imports) if self.imports else "No imports detected."
-        variables_text = ", ".join(self.variables_in_scope) if self.variables_in_scope else "No variables detected."
+        variables_text = (
+            ", ".join(self.variables_in_scope)
+            if self.variables_in_scope
+            else "No variables detected."
+        )
 
         return f"""
 File: {self.file_path}
@@ -72,6 +74,25 @@ Security Guidance:
 
 
 @dataclass
+class PatchCandidate:
+    """
+    Represents an AI-generated patch candidate.
+
+    In Phase 4, patches are generated but not yet validated.
+    Validation is introduced in Phase 6.
+    """
+
+    model: str
+    prompt_used: str
+    original_code: str
+    patched_code: str
+    raw_response: str
+    latency_ms: float
+    success: bool
+    error: Optional[str] = None
+
+
+@dataclass
 class VulnerabilityFinding:
     """
     Represents a single security finding produced by SecurePy AI.
@@ -86,6 +107,7 @@ class VulnerabilityFinding:
     code_snippet: str
     description: str
     context: Optional[VulnerabilityContext] = None
+    patch: Optional[PatchCandidate] = None
 
 
 @dataclass

@@ -63,18 +63,34 @@ python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm
 
 ### Option B — Real Local LLM via Ollama
 
-First, make sure [Ollama](https://ollama.com/download) is installed and running, then pull a model:
+#### 1. Start the Ollama server
+Open a dedicated terminal and run:
 ```powershell
-ollama pull codellama:13b
-# or a lighter option:
-ollama pull deepseek-coder:6.7b
-# or:
-ollama pull qwen2.5-coder:7b
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve
+```
+Leave this terminal running in the background.
+
+#### 2. Pull a model (one-time)
+The project uses `qwen2.5-coder:1.5b` by default (lightweight, ~986 MB):
+```powershell
+ollama pull qwen2.5-coder:1.5b
 ```
 
-Then scan with fix mode:
+Other supported options:
 ```powershell
-python -m securepy_ai.cli scan examples/vulnerable.py --fix --model codellama:13b
+ollama pull codellama:13b       # best quality, needs ~8 GB RAM
+ollama pull deepseek-coder:6.7b # good balance
+ollama pull qwen2.5-coder:7b    # medium size
+```
+
+Verify models are available:
+```powershell
+ollama list
+```
+
+#### 3. Run scan with real LLM
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-coder:1.5b
 ```
 
 ### Useful `--fix` Flags
@@ -90,7 +106,7 @@ python -m securepy_ai.cli scan examples/vulnerable.py --fix --model codellama:13
 
 ### Example — Scan with context + 1 real patch
 ```powershell
-python -m securepy_ai.cli scan examples/vulnerable.py --fix --model codellama:13b --max-patches 1 --context
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-coder:1.5b --max-patches 1 --context
 ```
 
 ---
@@ -151,6 +167,9 @@ py -m securepy_ai.cli scan examples/vulnerable.py
 **Cause**: The command was executed outside the root project folder.  
 **Fix**: Ensure your working directory contains `securepy_ai/` and run `python -m securepy_ai.cli ...`.
 
-### Error: `Ollama is not reachable`
-**Cause**: Ollama server is not running.  
-**Fix**: Start Ollama, or use `--mock-llm` for offline testing.
+### Error: `Ollama is not reachable` / `timed out waiting for server to start`
+**Cause**: The Ollama server process is not running.  
+**Fix**:
+1. Open a separate terminal and run: `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`
+2. Or open the **Ollama** desktop app from the Start menu and wait for the tray icon.
+3. Or use `--mock-llm` to skip Ollama entirely for offline testing.

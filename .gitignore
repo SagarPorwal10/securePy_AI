@@ -8,3 +8,5 @@ build/
 dist/
 *.egg-info/
 .DS_Store
+# Local Ollama connection config (copy from .env.example)
+.env

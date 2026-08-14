@@ -4,7 +4,9 @@ import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from securepy_ai.remediator.ollama_config import OllamaConfig
 
 
 class LLMClientError(Exception):
@@ -46,21 +48,36 @@ class BaseLLMClient(ABC):
 
 class OllamaClient(BaseLLMClient):
     """
-    Client for interacting with a local Ollama server.
+    Client for interacting with an Ollama server (local or remote).
 
-    Default endpoint:
-        http://127.0.0.1:11434
+    Accepts either an ``OllamaConfig`` object **or** the legacy keyword
+    arguments (``model``, ``base_url``, ``timeout``) for backwards
+    compatibility.  When both are supplied, explicit kwargs win.
+
+    Recommended usage (picks up .env / environment variables):
+        config = OllamaConfig.from_env()
+        client = OllamaClient(config=config)
+
+    Legacy usage (still works):
+        client = OllamaClient(model="codellama:13b", base_url="http://127.0.0.1:11434")
     """
 
     def __init__(
         self,
-        model: str = "codellama:13b",
-        base_url: str = "http://127.0.0.1:11434",
-        timeout: int = 180,
+        model: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: Optional[int] = None,
+        config: Optional[OllamaConfig] = None,
     ):
-        self.model = model
-        self.base_url = base_url.rstrip("/")
-        self.timeout = timeout
+        # Resolve from config first, then allow explicit kwargs to override.
+        _config = config or OllamaConfig.from_env()
+
+        self.model    = model    or _config.model
+        self.base_url = (base_url or _config.base_url).rstrip("/")
+        self.timeout  = timeout  if timeout is not None else _config.timeout
+
+        # Expose the resolved config for introspection / display.
+        self.config = _config
 
     def is_available(self) -> bool:
         """
@@ -99,7 +116,6 @@ class OllamaClient(BaseLLMClient):
             ],
             "options": {
                 "temperature": temperature,
-                "num_predict": max_tokens,
             },
         }
 

@@ -14,6 +14,7 @@ from securepy_ai.remediator.llm_client import (
     MockLLMClient,
     OllamaClient,
 )
+from securepy_ai.remediator.ollama_config import OllamaConfig
 from securepy_ai.remediator.patch_generator import PatchGenerator
 
 
@@ -201,21 +202,56 @@ def scan_command(args):
         if args.mock_llm:
             client = MockLLMClient()
         else:
-            client = OllamaClient(
-                model=args.model,
-                base_url=args.ollama_url,
-                timeout=args.timeout,
-            )
+            # --- Resolve connection config ---
+            # Priority: CLI flag > env var > .env file > built-in default
+
+            # Parse host + port out of --ollama-url if the user supplied it
+            # explicitly, so we can still let OllamaConfig drive everything else.
+            cli_url_supplied = args.ollama_url != "http://127.0.0.1:11434"
+
+            if cli_url_supplied:
+                # User passed an explicit URL — honour it fully.
+                config = OllamaConfig.from_env(
+                    model=args.model if args.model != "codellama:13b" else None,
+                    timeout=args.timeout if args.timeout != 180 else None,
+                )
+                client = OllamaClient(
+                    model=args.model,
+                    base_url=args.ollama_url,
+                    timeout=args.timeout,
+                    config=config,
+                )
+            else:
+                # No explicit URL — let OllamaConfig load from env / .env,
+                # then override model/timeout if the user changed those flags.
+                config = OllamaConfig.from_env(
+                    model=args.model if args.model != "codellama:13b" else None,
+                    timeout=args.timeout if args.timeout != 180 else None,
+                )
+                client = OllamaClient(config=config)
+
+            # Print resolved connection info before attempting to connect.
+            console.print(f"\n[bold cyan]Ollama Connection[/bold cyan]")
+            for line in client.config.describe().splitlines()[1:]:  # skip header
+                console.print(f"  [dim]{line.strip()}[/dim]")
 
             if not client.is_available():
                 console.print(
-                    "\n[bold red]Ollama is not reachable.[/bold red]"
+                    "\n[bold red]✗ Ollama is not reachable.[/bold red]"
                 )
+                if client.config.is_remote:
+                    console.print(
+                        f"  Remote host [bold]{client.config.host}[/bold] did not respond."
+                    )
+                    console.print(
+                        "  See [bold]OLLAMA_CONNECT.md[/bold] for the remote setup guide."
+                    )
+                else:
+                    console.print(
+                        "  Start Ollama locally or use [bold]--mock-llm[/bold] for offline testing."
+                    )
                 console.print(
-                    "Start Ollama or use [bold]--mock-llm[/bold] for offline testing."
-                )
-                console.print(
-                    f"Configured Ollama URL: [bold]{args.ollama_url}[/bold]"
+                    f"  Configured URL: [bold]{client.base_url}[/bold]"
                 )
                 return 1
 

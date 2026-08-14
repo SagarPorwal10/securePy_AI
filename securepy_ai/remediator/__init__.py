@@ -1,3 +1,4 @@
+from securepy_ai.remediator.ollama_config import OllamaConfig
 from securepy_ai.remediator.llm_client import (
     BaseLLMClient,
     LLMClientError,
@@ -13,6 +14,7 @@ from securepy_ai.remediator.patch_generator import (
 
 
 __all__ = [
+    "OllamaConfig",
     "BaseLLMClient",
     "LLMClientError",
     "LLMResponse",

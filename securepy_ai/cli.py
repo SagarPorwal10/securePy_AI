@@ -36,6 +36,7 @@ from securepy_ai.baseline import (
     save_baseline,
 )
 from securepy_ai.policies import determine_exit_code
+from securepy_ai.models import ScanReport
 
 
 console = Console()
@@ -309,9 +310,26 @@ def scan_command(args):
     """
     Handles:
         python -m securepy_ai.cli scan <target>
+        python -m securepy_ai.cli scan --files-from-json '["a.py","b.py"]'
     """
     scanner = SecurePyParser(rules=ALL_RULES)
-    report = scanner.scan_path(args.target)
+
+    if args.files_from_json:
+        import json as json_module
+
+        file_list = json_module.loads(args.files_from_json)
+        report = ScanReport()
+
+        for file_path in file_list:
+            try:
+                single_report = scanner.scan_path(file_path)
+                report.files_scanned += single_report.files_scanned
+                report.findings.extend(single_report.findings)
+                report.errors.extend(single_report.errors)
+            except Exception as exc:
+                report.errors.append(f"Failed to scan {file_path}: {exc}")
+    else:
+        report = scanner.scan_path(args.target)
 
     enricher = ContextEnricher()
     enricher.enrich(report)
@@ -333,7 +351,8 @@ def scan_command(args):
                 f"[green]Baseline saved: {baseline_created}[/green]"
             )
 
-        print_scan_header(report, args.target, baseline_ignored)
+        scan_target = "<diff-only: changed files>" if args.files_from_json else args.target
+        print_scan_header(report, scan_target, baseline_ignored)
 
         if args.context:
             print_context(report)
@@ -482,7 +501,14 @@ def main():
 
     scan_parser.add_argument(
         "target",
-        help="Path to Python file or directory",
+        nargs="?",
+        default=".",
+        help="Path to Python file or directory (default: current directory)",
+    )
+
+    scan_parser.add_argument(
+        "--files-from-json",
+        help="JSON array of file paths to scan (used for diff-only CI scanning)",
     )
 
     scan_parser.add_argument(

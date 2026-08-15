@@ -1,0 +1,73 @@
+name: "SecurePy AI"
+description: "AST-aware SAST scanner with optional LLM-assisted remediation for Python"
+author: "Sagar Porwal"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  target:
+    description: "File or directory to scan"
+    required: false
+    default: "."
+  fail_on:
+    description: "Minimum severity that fails the build: critical, high, medium, low, info, none"
+    required: false
+    default: "high"
+  report:
+    description: "Report type: json, html, sarif, all"
+    required: false
+    default: "all"
+  output_dir:
+    description: "Directory to store reports"
+    required: false
+    default: "reports"
+  baseline:
+    description: "Path to baseline JSON file"
+    required: false
+    default: ""
+  diff_only:
+    description: "Scan only files changed in the pull request"
+    required: false
+    default: "false"
+  enable_fix:
+    description: "off | mock | ollama — enables --fix with the chosen LLM mode"
+    required: false
+    default: "off"
+  model:
+    description: "Ollama model name when enable_fix=ollama"
+    required: false
+    default: "codellama:13b"
+  ollama_url:
+    description: "Ollama server URL for self-hosted runners"
+    required: false
+    default: "http://127.0.0.1:11434"
+  max_patches:
+    description: "Maximum number of patches to generate"
+    required: false
+    default: "3"
+  github_token:
+    description: "Token used to post PR comments"
+    required: false
+    default: ""
+
+outputs:
+  exit_code:
+    description: "SecurePy AI exit code"
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  env:
+    INPUT_TARGET: ${{ inputs.target }}
+    INPUT_FAIL_ON: ${{ inputs.fail_on }}
+    INPUT_REPORT: ${{ inputs.report }}
+    INPUT_OUTPUT_DIR: ${{ inputs.output_dir }}
+    INPUT_BASELINE: ${{ inputs.baseline }}
+    INPUT_DIFF_ONLY: ${{ inputs.diff_only }}
+    INPUT_ENABLE_FIX: ${{ inputs.enable_fix }}
+    INPUT_MODEL: ${{ inputs.model }}
+    INPUT_OLLAMA_URL: ${{ inputs.ollama_url }}
+    INPUT_MAX_PATCHES: ${{ inputs.max_patches }}
+    INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}

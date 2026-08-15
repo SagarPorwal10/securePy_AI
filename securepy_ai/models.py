@@ -74,12 +74,44 @@ Security Guidance:
 
 
 @dataclass
+class PatchValidation:
+    """
+    Holds the results of Phase 6 patch validation.
+
+    Checks:
+        syntax_valid    — patched code parses without SyntaxError
+        logic_preserved — original function/class names are intact
+        vuln_fixed      — the triggering rule no longer fires on the patch
+        no_new_vulns    — no new rule violations are introduced
+
+    Confidence score (0–100):
+        syntax_valid    → +30
+        logic_preserved → +20
+        vuln_fixed      → +30
+        no_new_vulns    → +20
+
+    passed = confidence_score >= 60
+    """
+
+    syntax_valid: bool
+    logic_preserved: bool
+    vuln_fixed: bool
+    no_new_vulns: bool
+    confidence_score: float
+    passed: bool
+    errors: List[str] = field(default_factory=list)
+    decision: str = ""
+
+
+
+@dataclass
 class PatchCandidate:
     """
     Represents an AI-generated patch candidate.
 
-    In Phase 4, patches are generated but not yet validated.
-    Validation is introduced in Phase 6.
+    Phase 4: patches are generated.
+    Phase 5: prompts are CWE-aware and structured.
+    Phase 6: every patch is validated and scored.
     """
 
     model: str
@@ -90,6 +122,7 @@ class PatchCandidate:
     latency_ms: float
     success: bool
     error: Optional[str] = None
+    validation: Optional[PatchValidation] = None
 
 
 @dataclass

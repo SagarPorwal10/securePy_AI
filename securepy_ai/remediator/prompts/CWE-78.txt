@@ -1,0 +1,8 @@
+Use subprocess with an argument list.
+Avoid shell=True and avoid constructing shell commands from user input.
+
+Example vulnerable code:
+os.system("ping -c 1 " + host)
+
+Example secure fix:
+subprocess.run(["ping", "-c", "1", host], check=True)

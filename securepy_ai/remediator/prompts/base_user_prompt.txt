@@ -1,0 +1,39 @@
+Fix the following confirmed security vulnerability in Python code.
+
+Vulnerability Details:
+- Type: {{VULNERABILITY_TYPE}}
+- CWE: {{CWE_ID}}
+- Severity: {{SEVERITY}}
+- File: {{FILE_PATH}}
+- Line: {{LINE_NUMBER}}
+- Function: {{FUNCTION_NAME}}
+
+Security Context:
+Data Flow: {{DATA_FLOW}}
+Source: {{SOURCE}}
+Sink: {{SINK}}
+
+Imports:
+{{IMPORTS}}
+
+Variables in Scope:
+{{VARIABLES_IN_SCOPE}}
+
+CWE-Specific Guidance:
+{{CWE_GUIDANCE}}
+
+Function Scope:
+{{FUNCTION_SCOPE}}
+
+Surrounding Code:
+{{SURROUNDING_CODE}}
+
+Code to Fix:
+{{CODE_TO_FIX}}
+
+Output Requirements:
+1. Return only valid Python code.
+2. Fix only the vulnerability.
+3. Preserve intended functionality.
+4. Add a short comment explaining the security fix.
+5. Do not include explanations outside the code.

@@ -1,0 +1,9 @@
+Avoid deserializing untrusted data with pickle, marshal, or unsafe YAML loaders.
+Use JSON or another safe format, and validate the data schema before loading.
+
+Example vulnerable code:
+data = pickle.loads(user_blob)
+
+Example secure fix:
+import json
+data = json.loads(user_blob)

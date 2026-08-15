@@ -1,0 +1,9 @@
+Avoid eval, exec, or compile on untrusted or dynamic input.
+Use safe parsers or restricted domain-specific logic.
+
+Example vulnerable code:
+result = eval(user_input)
+
+Example secure fix:
+# Use a safe parser or explicit validation instead of eval.
+result = safe_parse(user_input)

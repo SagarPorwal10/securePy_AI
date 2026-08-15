@@ -1,3 +1,289 @@
+Excellent, Sagar. Since **Phase 7 is done**, now we move to:
+
+# Phase 8 — Advanced CLI and CI-Friendly Developer Experience
+
+Phase 7 gave SecurePy AI proper reporting.
+
+Phase 8 makes SecurePy AI behave like a real developer security product.
+
+After Phase 8, SecurePy AI will support:
+
+```text
+--fail-on severity threshold
+--quiet mode
+--format json
+--baseline
+--create-baseline
+CI-friendly exit codes
+```
+
+This is very important for your product vision:
+
+> Developers should not be flooded with old findings, and CI should fail only when meaningful security issues appear.
+
+---
+
+# Phase 8 Goal
+
+After Phase 8, SecurePy AI will support commands like:
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on critical
+```
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --quiet
+```
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --format json
+```
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --create-baseline baseline.json
+```
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --baseline baseline.json --fail-on high
+```
+
+---
+
+# Phase 8 Files
+
+We will add:
+
+```text
+securepy_ai/
+├── baseline.py
+└── policies.py
+
+tests/
+├── test_baseline.py
+└── test_policies.py
+```
+
+We will update:
+
+```text
+securepy_ai/cli.py
+```
+
+---
+
+# 1. Create Baseline Engine
+
+Create:
+
+```text
+securepy_ai/baseline.py
+```
+
+Baseline mode helps ignore existing known findings and only flag new findings.
+
+This solves a major developer frustration:
+
+```text
+I inherited 200 old findings.
+Now every pull request fails.
+```
+
+```python
+import hashlib
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Set, Tuple
+
+from securepy_ai.models import ScanReport, VulnerabilityFinding
+
+
+def finding_fingerprint(finding: VulnerabilityFinding) -> str:
+    """
+    Creates a stable fingerprint for a finding.
+
+    The fingerprint is based on:
+        - Rule ID
+        - File path
+        - Vulnerable code snippet
+
+    Line number is intentionally avoided because line numbers
+    can shift during normal development.
+    """
+    payload = "|".join(
+        [
+            finding.rule_id,
+            finding.file_path,
+            finding.code_snippet.strip(),
+        ]
+    )
+
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def load_baseline(path: str) -> Set[str]:
+    """
+    Loads baseline fingerprints from a JSON file.
+    """
+    baseline_path = Path(path)
+
+    if not baseline_path.exists():
+        return set()
+
+    try:
+        data = json.loads(baseline_path.read_text(encoding="utf-8"))
+        return set(data.get("findings", []))
+    except json.JSONDecodeError:
+        return set()
+
+
+def save_baseline(report: ScanReport, path: str) -> Path:
+    """
+    Saves current findings as a baseline JSON file.
+    """
+    baseline_path = Path(path)
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fingerprints = sorted(
+        {
+            finding_fingerprint(finding)
+            for finding in report.findings
+        }
+    )
+
+    payload = {
+        "tool": "SecurePy AI",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "findings": fingerprints,
+    }
+
+    baseline_path.write_text(
+        json.dumps(payload, indent=2),
+        encoding="utf-8",
+    )
+
+    return baseline_path
+
+
+def filter_baseline(
+    report: ScanReport,
+    baseline_fingerprints: Set[str],
+) -> Tuple[ScanReport, int]:
+    """
+    Removes findings that already exist in the baseline.
+
+    Returns:
+        - Updated report containing only new findings
+        - Number of ignored baseline findings
+    """
+    new_findings = []
+    ignored_count = 0
+
+    for finding in report.findings:
+        fingerprint = finding_fingerprint(finding)
+
+        if fingerprint in baseline_fingerprints:
+            ignored_count += 1
+        else:
+            new_findings.append(finding)
+
+    report.findings = new_findings
+
+    return report, ignored_count
+```
+
+---
+
+# 2. Create CI Policy Engine
+
+Create:
+
+```text
+securepy_ai/policies.py
+```
+
+This controls exit codes and severity thresholds.
+
+```python
+from securepy_ai.models import ScanReport
+
+
+SEVERITY_ORDER = {
+    "info": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
+
+
+def _severity_rank(severity_value: str) -> int:
+    """
+    Converts severity text into a numeric rank.
+    """
+    return SEVERITY_ORDER.get(severity_value.lower(), 0)
+
+
+def has_findings_at_or_above(report: ScanReport, threshold: str) -> bool:
+    """
+    Checks whether the report contains findings at or above
+    the given severity threshold.
+    """
+    if threshold.lower() in {"none", "off"}:
+        return False
+
+    threshold_rank = SEVERITY_ORDER.get(threshold.lower())
+
+    if threshold_rank is None:
+        return False
+
+    for finding in report.findings:
+        if _severity_rank(finding.severity.value) >= threshold_rank:
+            return True
+
+    return False
+
+
+def determine_exit_code(
+    report: ScanReport,
+    fail_on: str = "high",
+    has_scanner_errors: bool = False,
+) -> int:
+    """
+    Determines CI-friendly exit codes.
+
+    Exit codes:
+        0 → success / no blocking findings
+        1 → blocking findings detected
+        2 → scanner/tool error
+    """
+    if has_scanner_errors and not report.findings:
+        return 2
+
+    if fail_on.lower() in {"none", "off"}:
+        return 0
+
+    if has_findings_at_or_above(report, fail_on):
+        return 1
+
+    return 0
+```
+
+---
+
+# 3. Update CLI
+
+Replace:
+
+```text
+securepy_ai/cli.py
+```
+
+with this updated version.
+
+This is the Phase 8 CLI.
+
+```python
 import argparse
 import json
 
@@ -19,7 +305,7 @@ from securepy_ai.remediator.llm_client import (
 from securepy_ai.remediator.patch_generator import PatchGenerator
 from securepy_ai.remediator.prompt_builder import PromptBuilder
 
-from securepy_ai.remediator.patch_validator import PatchValidator
+from securepy_ai.validator.patch_validator import PatchValidator
 
 from securepy_ai.reporter import (
     build_summary,
@@ -598,3 +884,426 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
+
+---
+
+# 4. Add Baseline Tests
+
+Create:
+
+```text
+tests/test_baseline.py
+```
+
+```python
+from securepy_ai.baseline import (
+    filter_baseline,
+    finding_fingerprint,
+    load_baseline,
+    save_baseline,
+)
+from securepy_ai.models import (
+    ScanReport,
+    Severity,
+    VulnerabilityFinding,
+)
+
+
+def make_finding(
+    rule_id="SEC101",
+    file_path="app.py",
+    code_snippet='password = "admin123"',
+):
+    return VulnerabilityFinding(
+        rule_id=rule_id,
+        vuln_type="Hardcoded Secret",
+        cwe_id="CWE-798",
+        severity=Severity.HIGH,
+        file_path=file_path,
+        line_number=1,
+        code_snippet=code_snippet,
+        description="Possible hardcoded secret.",
+    )
+
+
+def test_fingerprint_is_stable():
+    finding_one = make_finding()
+    finding_two = make_finding()
+
+    assert finding_fingerprint(finding_one) == finding_fingerprint(finding_two)
+
+
+def test_fingerprint_changes_with_code():
+    finding_one = make_finding(code_snippet='password = "admin123"')
+    finding_two = make_finding(code_snippet='password = "hunter22"')
+
+    assert finding_fingerprint(finding_one) != finding_fingerprint(finding_two)
+
+
+def test_save_and_load_baseline(tmp_path):
+    report = ScanReport(
+        files_scanned=1,
+        findings=[make_finding()],
+        errors=[],
+    )
+
+    baseline_path = tmp_path / "baseline.json"
+
+    save_baseline(report, str(baseline_path))
+    loaded = load_baseline(str(baseline_path))
+
+    assert finding_fingerprint(make_finding()) in loaded
+
+
+def test_filter_baseline_removes_known_findings():
+    known_finding = make_finding(
+        code_snippet='password = "admin123"',
+    )
+
+    new_finding = make_finding(
+        code_snippet='api_key = "AKIA1234567890"',
+    )
+
+    report = ScanReport(
+        files_scanned=1,
+        findings=[known_finding, new_finding],
+        errors=[],
+    )
+
+    baseline = {
+        finding_fingerprint(known_finding),
+    }
+
+    filtered_report, ignored_count = filter_baseline(report, baseline)
+
+    assert ignored_count == 1
+    assert len(filtered_report.findings) == 1
+    assert filtered_report.findings[0].code_snippet == 'api_key = "AKIA1234567890"'
+```
+
+---
+
+# 5. Add Policy Tests
+
+Create:
+
+```text
+tests/test_policies.py
+```
+
+```python
+from securepy_ai.models import (
+    ScanReport,
+    Severity,
+    VulnerabilityFinding,
+)
+from securepy_ai.policies import (
+    determine_exit_code,
+    has_findings_at_or_above,
+)
+
+
+def make_report(severity):
+    finding = VulnerabilityFinding(
+        rule_id="SEC101",
+        vuln_type="Hardcoded Secret",
+        cwe_id="CWE-798",
+        severity=severity,
+        file_path="app.py",
+        line_number=1,
+        code_snippet='password = "admin123"',
+        description="Possible hardcoded secret.",
+    )
+
+    return ScanReport(
+        files_scanned=1,
+        findings=[finding],
+        errors=[],
+    )
+
+
+def test_critical_finding_fails_critical_threshold():
+    report = make_report(Severity.CRITICAL)
+
+    assert has_findings_at_or_above(report, "critical") is True
+    assert determine_exit_code(report, fail_on="critical") == 1
+
+
+def test_high_finding_does_not_fail_critical_threshold():
+    report = make_report(Severity.HIGH)
+
+    assert has_findings_at_or_above(report, "critical") is False
+    assert determine_exit_code(report, fail_on="critical") == 0
+
+
+def test_high_finding_fails_high_threshold():
+    report = make_report(Severity.HIGH)
+
+    assert determine_exit_code(report, fail_on="high") == 1
+
+
+def test_medium_finding_does_not_fail_high_threshold():
+    report = make_report(Severity.MEDIUM)
+
+    assert determine_exit_code(report, fail_on="high") == 0
+
+
+def test_fail_on_none_always_returns_zero():
+    report = make_report(Severity.CRITICAL)
+
+    assert determine_exit_code(report, fail_on="none") == 0
+
+
+def test_scanner_error_with_no_findings_returns_two():
+    report = ScanReport(
+        files_scanned=1,
+        findings=[],
+        errors=["Syntax error in file.py"],
+    )
+
+    assert determine_exit_code(report, fail_on="high", has_scanner_errors=True) == 2
+```
+
+---
+
+# 6. Run Phase 8
+
+Make sure you are in the project root:
+
+```bash
+cd securepy-ai
+```
+
+## Normal scan
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py
+```
+
+Default exit policy:
+
+```text
+Fail on high or critical findings.
+```
+
+---
+
+## Fail only on critical findings
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on critical
+```
+
+---
+
+## Do not fail the build
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on none
+```
+
+---
+
+## Quiet mode
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --quiet
+```
+
+Expected output:
+
+```text
+files_scanned=1 findings=10 baseline_ignored=0 errors=0 patches_generated=0 valid_patches=0 exit_code=1
+```
+
+---
+
+## JSON output
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --format json
+```
+
+To save JSON:
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --format json > scan.json
+```
+
+---
+
+## Create baseline
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --create-baseline baseline.json
+```
+
+Expected:
+
+```text
+Baseline saved: baseline.json
+```
+
+---
+
+## Scan using baseline
+
+```bash
+python -m securepy_ai.cli scan examples/vulnerable.py --baseline baseline.json
+```
+
+Expected:
+
+```text
+Baseline ignored findings: 10
+No new vulnerabilities found.
+```
+
+Exit code should usually be:
+
+```text
+0
+```
+
+This is very useful for existing projects.
+
+---
+
+# 7. Run Tests
+
+Run all tests:
+
+```bash
+pytest tests/ -v
+```
+
+Run Phase 8 tests:
+
+```bash
+pytest tests/test_baseline.py tests/test_policies.py -v
+```
+
+Expected:
+
+```text
+tests/test_baseline.py::test_fingerprint_is_stable PASSED
+tests/test_baseline.py::test_fingerprint_changes_with_code PASSED
+tests/test_baseline.py::test_save_and_load_baseline PASSED
+tests/test_baseline.py::test_filter_baseline_removes_known_findings PASSED
+
+tests/test_policies.py::test_critical_finding_fails_critical_threshold PASSED
+tests/test_policies.py::test_high_finding_does_not_fail_critical_threshold PASSED
+tests/test_policies.py::test_high_finding_fails_high_threshold PASSED
+tests/test_policies.py::test_medium_finding_does_not_fail_high_threshold PASSED
+tests/test_policies.py::test_fail_on_none_always_returns_zero PASSED
+tests/test_policies.py::test_scanner_error_with_no_findings_returns_two PASSED
+```
+
+---
+
+# 8. Add Baseline to `.gitignore`, Optional
+
+If you do not want to commit local baselines, add:
+
+```text
+baseline.json
+```
+
+to `.gitignore`.
+
+But in real projects, baseline files are often committed so CI can use them.
+
+---
+
+# 9. Phase 8 Acceptance Checklist
+
+Phase 8 is complete when:
+
+```text
+✅ baseline.py is created
+✅ policies.py is created
+✅ CLI supports --fail-on
+✅ CLI supports --quiet
+✅ CLI supports --format json
+✅ CLI supports --baseline
+✅ CLI supports --create-baseline
+✅ Exit code is CI-friendly
+✅ Baseline filters known findings
+✅ JSON output works
+✅ Baseline tests pass
+✅ Policy tests pass
+✅ Code is committed to GitHub
+```
+
+---
+
+# 10. Commit Phase 8
+
+Run:
+
+```bash
+git add .
+git commit -m "feat(phase-8): add CI-friendly CLI, baseline mode, and severity policies"
+```
+
+Push:
+
+```bash
+git push
+```
+
+If using feature branch:
+
+```bash
+git push origin securepy-ai-phase-8
+```
+
+---
+
+# 11. Why Phase 8 Matters for Your Product Vision
+
+Phase 8 directly solves developer frustrations with external scanners.
+
+| Frustration | SecurePy AI Feature |
+|---|---|
+| Too many old findings | `--baseline` |
+| CI fails for low-severity issues | `--fail-on` |
+| Noisy output | `--quiet` |
+| Hard to integrate with automation | `--format json` |
+| Unclear build failure behavior | deterministic exit codes |
+| Existing codebase has too many issues | baseline mode |
+
+This makes SecurePy AI feel less like a college tool and more like a real security product.
+
+---
+
+# 12. What Comes in Phase 9
+
+Phase 9 is:
+
+```text
+GitHub Action Integration
+```
+
+We will build:
+
+```text
+action.yml
+GitHub workflow
+PR comment bot
+CI artifact upload
+SARIF upload, optional
+```
+
+After Phase 9, SecurePy AI will run automatically when developers open pull requests.
+
+---
+
+Once you complete Phase 8, reply:
+
+```text
+Phase 8 done
+```
+
+Then I will give you **Phase 9 complete code**, where we build the **GitHub Action and CI/CD integration**.

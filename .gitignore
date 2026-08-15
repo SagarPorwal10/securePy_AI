@@ -10,3 +10,5 @@ dist/
 .DS_Store
 # Local Ollama connection config (copy from .env.example)
 .env
+# Generated Phase 7 reports
+reports/

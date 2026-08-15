@@ -45,6 +45,12 @@ Displays rich context (data flow, source/sink, imports, variables) for each find
 python -m securepy_ai.cli scan examples/vulnerable.py --context
 ```
 
+### Show Generated LLM Prompts (Phase 5+)
+Displays the CWE-aware structured prompt that will be sent to the LLM:
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --show-prompts --max-prompts 2
+```
+
 ### Check Package Version
 ```powershell
 python -m securepy_ai.cli --version
@@ -52,19 +58,30 @@ python -m securepy_ai.cli --version
 
 ---
 
-## 🤖 AI Patch Generation (Phase 4)
+## 🤖 AI Patch Generation + Validation (Phase 4–6)
 
-SecurePy AI can generate fix candidates for detected vulnerabilities using a local LLM.
+SecurePy AI generates fix candidates for detected vulnerabilities using a local LLM,
+then **validates** each patch automatically (Phase 6).
 
 ### Option A — Mock LLM (No Ollama required, great for testing)
 ```powershell
 python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm
 ```
 
+Expected output includes:
+```text
+Validation: [PASS]  Confidence: 100/100
+
+  [OK]  Syntax valid        (+30)
+  [OK]  Logic preserved     (+20)
+  [OK]  Vulnerability fixed (+30)
+  [OK]  No new vulns        (+20)
+```
+
 ### Option B — Real Local LLM via Ollama
 
 #### 1. Start the Ollama server
-Open a dedicated terminal and run:
+Open a **dedicated terminal** and run:
 ```powershell
 & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve
 ```
@@ -93,7 +110,9 @@ ollama list
 python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-coder:1.5b
 ```
 
-### Useful `--fix` Flags
+---
+
+## ⚙️ All `--fix` Flags
 
 | Flag | Default | Description |
 |---|---|---|
@@ -103,41 +122,68 @@ python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-code
 | `--ollama-url` | `http://127.0.0.1:11434` | Ollama server URL |
 | `--timeout` | `180` | Request timeout in seconds |
 | `--max-patches` | `3` | Max number of patches to generate |
+| `--no-validate` | off | Skip Phase 6 patch validation (faster) |
 
-### Example — Scan with context + 1 real patch
+---
+
+## 📋 Common Commands — Quick Reference
+
+### Phase 6 — Full pipeline (scan → context → patches → validation)
 ```powershell
-python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-coder:1.5b --max-patches 1 --context
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --max-patches 2
+```
+
+### Phase 6 — With real Ollama, 1 patch
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-coder:1.5b --max-patches 1
+```
+
+### Phase 5 — Show CWE-aware prompts only (no LLM call)
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --show-prompts --max-prompts 2
+```
+
+### Phase 4–6 — Full output: context + prompts + patches + validation
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --context --show-prompts --fix --mock-llm --max-patches 2
+```
+
+### Skip validation (speed test / offline comparison)
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --no-validate
 ```
 
 ---
 
 ## 🧪 Running Automated Tests
 
-### Run All Tests
+### Run All Tests (50 tests across all phases)
 ```powershell
 pytest tests/ -v
 ```
 
-Expected output (25 tests):
+Expected output:
 ```text
-tests/test_context.py::test_sql_injection_context PASSED
-tests/test_context.py::test_command_injection_context PASSED
-tests/test_context.py::test_hardcoded_secret_context PASSED
-tests/test_context.py::test_context_contains_surrounding_lines PASSED
-tests/test_context.py::test_context_contains_cwe_guidance PASSED
-tests/test_llm.py::test_extract_python_code_from_markdown PASSED
-tests/test_llm.py::test_extract_invalid_python_code PASSED
-tests/test_llm.py::test_patch_generator_with_mock_llm PASSED
-tests/test_llm.py::test_prompt_contains_finding_details PASSED
-tests/test_llm.py::test_prompt_includes_code_to_fix PASSED
-tests/test_rules.py::... (10 tests) PASSED
-tests/test_scanner.py::... (3 tests) PASSED
+tests/test_context.py           5 tests  PASSED
+tests/test_llm.py               5 tests  PASSED
+tests/test_patch_validator.py  17 tests  PASSED
+tests/test_prompt_builder.py    8 tests  PASSED
+tests/test_rules.py            12 tests  PASSED
+tests/test_scanner.py           3 tests  PASSED
+
+50 passed in 0.32s
 ```
 
-### Run Only Phase 4 LLM Tests
-```powershell
-pytest tests/test_llm.py -v
-```
+### Run Phase-Specific Tests
+
+| Phase | Command |
+|---|---|
+| Phase 3 (context) | `pytest tests/test_context.py -v` |
+| Phase 4 (LLM) | `pytest tests/test_llm.py -v` |
+| Phase 5 (prompts) | `pytest tests/test_prompt_builder.py -v` |
+| Phase 6 (validator) | `pytest tests/test_patch_validator.py -v` |
+| Rules only | `pytest tests/test_rules.py -v` |
+| All | `pytest tests/ -v` |
 
 ---
 
@@ -173,3 +219,7 @@ py -m securepy_ai.cli scan examples/vulnerable.py
 1. Open a separate terminal and run: `& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve`
 2. Or open the **Ollama** desktop app from the Start menu and wait for the tray icon.
 3. Or use `--mock-llm` to skip Ollama entirely for offline testing.
+
+### Patch shows `[FAIL]` validation
+**Cause**: The LLM didn't fully fix the vulnerability, or introduced a new one.  
+**Fix**: This is expected behaviour — it shows Phase 6 validation is working. Try a stronger model or `--max-patches` with a higher limit to generate more attempts.

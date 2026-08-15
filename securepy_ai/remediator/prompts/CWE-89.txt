@@ -1,0 +1,10 @@
+Use parameterized queries or prepared statements.
+Do not concatenate, format, or interpolate user-controlled input into SQL strings.
+
+Example vulnerable code:
+query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
+
+Example secure fix:
+query = "SELECT * FROM users WHERE id = ?"
+cursor.execute(query, (user_id,))

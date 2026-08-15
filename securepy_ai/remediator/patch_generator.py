@@ -12,27 +12,14 @@ from securepy_ai.remediator.llm_client import (
     BaseLLMClient,
     LLMClientError,
 )
+from securepy_ai.remediator.prompt_builder import PromptBuilder
+from securepy_ai.remediator.patch_validator import PatchValidator
 
 
 CODE_FENCE_PATTERN = re.compile(
     r"```(?:python|py)?\s*(.*?)```",
     re.IGNORECASE | re.DOTALL,
 )
-
-
-SYSTEM_PROMPT = """
-You are a senior application security engineer.
-
-Your task is to fix confirmed security vulnerabilities in Python code.
-
-Rules:
-1. Fix only the vulnerability.
-2. Preserve the intended functionality.
-3. Return only valid Python code.
-4. Do not include explanations outside the code.
-5. Add a short comment explaining the security fix.
-6. Follow secure coding best practices.
-""".strip()
 
 
 def is_valid_python(code: str) -> bool:
@@ -133,15 +120,27 @@ def extract_python_code(raw_response: str) -> str:
 class PatchGenerator:
     """
     Generates AI patch candidates for SecurePy AI findings.
+
+    Phase 5 update:
+        Patch generation now uses the structured PromptBuilder for
+        CWE-aware, context-rich prompts.
+
+    Phase 6 update:
+        An optional PatchValidator runs after each patch is generated
+        and attaches a PatchValidation to the candidate.
     """
 
     def __init__(
         self,
         client: BaseLLMClient,
+        prompt_builder: Optional[PromptBuilder] = None,
+        validator: Optional[PatchValidator] = None,
         temperature: float = 0.1,
         max_tokens: int = 2048,
     ):
         self.client = client
+        self.prompt_builder = prompt_builder or PromptBuilder()
+        self.validator = validator
         self.temperature = temperature
         self.max_tokens = max_tokens
 
@@ -179,7 +178,7 @@ class PatchGenerator:
 
         try:
             response = self.client.generate(
-                system_prompt=SYSTEM_PROMPT,
+                system_prompt=self.prompt_builder.get_system_prompt(),
                 user_prompt=prompt,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
@@ -192,7 +191,7 @@ class PatchGenerator:
             if not success:
                 error = "LLM response did not contain valid Python code."
 
-            return PatchCandidate(
+            candidate = PatchCandidate(
                 model=response.model,
                 prompt_used=prompt,
                 original_code=original_code,
@@ -202,6 +201,11 @@ class PatchGenerator:
                 success=success,
                 error=error,
             )
+
+            if self.validator is not None and success:
+                candidate.validation = self.validator.validate(finding, candidate)
+
+            return candidate
 
         except LLMClientError as exc:
             latency_ms = (time.perf_counter() - start_time) * 1000
@@ -233,54 +237,9 @@ class PatchGenerator:
 
     def build_user_prompt(self, finding: VulnerabilityFinding) -> str:
         """
-        Builds the user prompt sent to the LLM.
+        Builds the user prompt using PromptBuilder.
         """
-        parts = [
-            "Fix the following confirmed security vulnerability.",
-            "",
-            f"Rule ID: {finding.rule_id}",
-            f"Vulnerability Type: {finding.vuln_type}",
-            f"CWE: {finding.cwe_id}",
-            f"Severity: {finding.severity.value}",
-            f"File: {finding.file_path}",
-            f"Line: {finding.line_number}",
-            "",
-            "Requirements:",
-            "1. Fix only the vulnerability.",
-            "2. Preserve intended functionality.",
-            "3. Return only valid Python code.",
-            "4. Do not include explanations outside code.",
-            "5. Add a brief security-fix comment.",
-        ]
-
-        if finding.context is not None:
-            parts.extend(
-                [
-                    "",
-                    "Security Context:",
-                    finding.context.to_prompt_context(),
-                ]
-            )
-        else:
-            parts.extend(
-                [
-                    "",
-                    "Vulnerable Code:",
-                    finding.code_snippet,
-                ]
-            )
-
-        original_code = self._get_original_code(finding)
-
-        parts.extend(
-            [
-                "",
-                "Code to fix:",
-                original_code,
-            ]
-        )
-
-        return "\n".join(parts)
+        return self.prompt_builder.build_user_prompt(finding)
 
     def _get_original_code(self, finding: VulnerabilityFinding) -> str:
         """

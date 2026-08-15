@@ -72,7 +72,7 @@ def test_prompt_contains_finding_details():
 
     prompt = generator.build_user_prompt(finding)
 
-    assert "SEC102" in prompt
+    # Phase 5: rule_id is not in the structured template; vuln_type, CWE, file, line are.
     assert "SQL Injection" in prompt
     assert "CWE-89" in prompt
     assert "app.py" in prompt
@@ -85,5 +85,6 @@ def test_prompt_includes_code_to_fix():
 
     prompt = generator.build_user_prompt(finding)
 
-    assert "Code to fix:" in prompt
+    # Phase 5: section header uses capital F in the structured template.
+    assert "Code to Fix:" in prompt
     assert "SELECT" in prompt

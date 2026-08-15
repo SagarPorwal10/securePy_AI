@@ -1,0 +1,9 @@
+Do not hardcode secrets in source code.
+Load secrets from environment variables or a secrets manager.
+
+Example vulnerable code:
+API_KEY = "AKIA1234567890EXAMPLE"
+
+Example secure fix:
+import os
+API_KEY = os.environ.get("API_KEY")

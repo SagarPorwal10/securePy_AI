@@ -11,6 +11,12 @@ from securepy_ai.remediator.patch_generator import (
     extract_python_code,
     is_valid_python,
 )
+from securepy_ai.remediator.prompt_builder import (
+    PromptBuilder,
+    PromptBuilderError,
+)
+from securepy_ai.remediator.patch_validator import PatchValidator
+from securepy_ai.models import PatchValidation
 
 
 __all__ = [
@@ -21,6 +27,10 @@ __all__ = [
     "MockLLMClient",
     "OllamaClient",
     "PatchGenerator",
+    "PatchValidation",
+    "PatchValidator",
+    "PromptBuilder",
+    "PromptBuilderError",
     "extract_python_code",
     "is_valid_python",
 ]

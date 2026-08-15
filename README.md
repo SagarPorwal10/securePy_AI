@@ -15,6 +15,10 @@ This repository is being developed in phases:
 - Phase 9: GitHub Action integration
 - Phase 10: Dashboard visualization
 
+## Architecture & Design
+
+For complete Mermaid diagrams and end-to-end system architecture specifications, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Quick Start & Usage Guide
 
 For step-by-step instructions on running the scanner and resolving environment issues, see [HOW_TO_RUN.md](HOW_TO_RUN.md).

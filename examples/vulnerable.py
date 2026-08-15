@@ -4,7 +4,10 @@ import subprocess
 import yaml
 
 
-password = "admin123"
+# SecurePy AI mock patch
+def securepy_mock_fix():
+    # Replace with validated secure implementation.
+    return None
 api_key = "AKIA923848239482394"
 db_secret = "supersecret123"
 

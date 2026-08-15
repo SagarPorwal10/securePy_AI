@@ -1,0 +1,117 @@
+# ============================================================
+# SecurePy AI — Phase 10 Dashboard
+# images_required.txt
+# ============================================================
+# This file lists every image slot in the dashboard.
+# Images marked [GENERATED] are already in place.
+# Images marked [OPTIONAL UPGRADE] work with the current
+# SVG/code placeholder but can be replaced with a real photo
+# or screenshot for your thesis demo / publication.
+# ============================================================
+
+
+# ── SLOT A — Research section: AST diagram ──────────────────
+Location : dashboard/src/App.jsx → <ASTTree /> component
+           inside <section id="research"> → .sy-res-sticky div
+Caption  : fig. 01 — abstract syntax tree with flagged sinks
+Status   : [GENERATED] A procedurally drawn SVG tree is rendered
+           at runtime. No static image file is needed for the
+           dashboard to function.
+
+[OPTIONAL UPGRADE]
+Replace the <ASTTree /> SVG with a real screenshot when you want
+a more publication-accurate diagram. Steps:
+
+  1. Run SecurePy AI on a sample file:
+       python -m securepy_ai.cli scan examples/vulnerable.py --context
+
+  2. Take a screenshot of the AST or the context output,
+     or export a diagram from a tool like graphviz / ast-viewer.
+
+  3. Save the image as:
+       dashboard/public/images/ast-diagram.png
+       Recommended size: 800×640 px, PNG with transparent bg
+
+  4. In App.jsx, find the comment "IMAGE SLOT A" and replace:
+       <ASTTree />
+     with:
+       <img
+         src="/images/ast-diagram.png"
+         alt="Abstract Syntax Tree with flagged vulnerability nodes"
+         width="400"
+         height="320"
+         loading="lazy"
+         style={{ width: '100%', display: 'block' }}
+       />
+
+
+# ── SLOT B — Footer: project logo ───────────────────────────
+Location : dashboard/src/App.jsx → <footer> → .sy-foot-l div
+           The <Logo /> inline SVG component
+Status   : [GENERATED] An inline SVG shield-S mark is used.
+           No static image file is needed.
+
+[OPTIONAL UPGRADE]
+A generated logo is already saved at:
+  dashboard/public/logo.jpg
+
+To use it instead of the inline SVG, find the comment
+"IMAGE SLOT B" in App.jsx and replace:
+  <Logo />
+with:
+  <img
+    src="/logo.jpg"
+    alt="SecurePy AI logo"
+    width="32"
+    height="32"
+    style={{ borderRadius: '4px', objectFit: 'cover' }}
+    loading="lazy"
+  />
+
+
+# ── SLOT C — Open Graph / Social sharing ────────────────────
+Location : dashboard/index.html → <meta property="og:image">
+           dashboard/index.html → <meta name="twitter:image">
+File     : dashboard/public/og-image.jpg
+Status   : [GENERATED] A 16:9 social card was generated and
+           placed at dashboard/public/og-image.jpg.
+           The meta tags in index.html already reference it.
+
+[OPTIONAL UPGRADE — for GitHub Pages / public deployment]
+If you deploy to a custom domain, update the og:image URL in
+index.html to an absolute URL:
+  <meta property="og:image"
+        content="https://sagarporwal10.github.io/securePy_AI/og-image.jpg" />
+
+For a higher-quality OG image you could use a screenshot of
+the running dashboard itself (1200×630 px is ideal for Twitter).
+
+
+# ── SLOT D — Favicon ────────────────────────────────────────
+Location : dashboard/index.html → <link rel="icon">
+File     : dashboard/public/logo.jpg  (currently used as favicon)
+Status   : [GENERATED] logo.jpg is referenced as the favicon.
+
+[OPTIONAL UPGRADE]
+For crisp favicons, convert logo.jpg to a proper .ico or .png:
+  1. Resize logo.jpg to 32×32 and 16×16
+  2. Save as dashboard/public/favicon.ico
+  3. Update index.html:
+       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  Or use a 32×32 PNG:
+       <link rel="icon" type="image/png" href="/favicon-32.png" />
+
+
+# ── SUMMARY ─────────────────────────────────────────────────
+#
+#  Slot  | Status              | File
+#  ──────|─────────────────────|────────────────────────────────
+#  A     | GENERATED (SVG)     | No file — runtime SVG
+#  B     | GENERATED (SVG)     | No file — runtime SVG
+#  C     | GENERATED (photo)   | dashboard/public/og-image.jpg
+#  D     | GENERATED (photo)   | dashboard/public/logo.jpg
+#
+#  The dashboard runs 100% without any additional images.
+#  Slots A and B can be upgraded with real screenshots
+#  for thesis/publication demos.
+# ============================================================

@@ -1,0 +1,11 @@
+/* Global reset only — all component styles are in App.jsx via the CSS template literal */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: #0a0e14;
+  color: #dbe4ec;
+  overflow-x: hidden;
+}

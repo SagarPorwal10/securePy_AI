@@ -56,10 +56,10 @@ def check_icon(status):
     Returns an icon for validation check status.
     """
     icons = {
-        "pass": "✅",
-        "fail": "❌",
-        "warn": "⚠️",
-        "skipped": "⏭️",
+        "pass": "[OK]",
+        "fail": "[X]",
+        "warn": "[!]",
+        "skipped": "[-]",
     }
 
     return icons.get(status, "•")
@@ -181,11 +181,16 @@ def print_patches(report):
                 )
                 validation_lines.append("")
 
-                for check in patch.validation.checks:
+                checks = [
+                    ("Syntax valid", "pass" if patch.validation.syntax_valid else "fail"),
+                    ("Logic preserved", "pass" if patch.validation.logic_preserved else "fail"),
+                    ("Vulnerability fixed", "pass" if patch.validation.vuln_fixed else "fail"),
+                    ("No new vulnerabilities", "pass" if patch.validation.no_new_vulns else "fail"),
+                ]
+
+                for name, status in checks:
                     validation_lines.append(
-                        f"{check_icon(check.status)} {escape(check.name)} — "
-                        f"{escape(check.status.upper())} — "
-                        f"{escape(check.message)}"
+                        f"{check_icon(status)} {escape(name)} — {escape(status.upper())}"
                     )
 
                 body += "\n[bold]Patch Validation:[/bold]\n"

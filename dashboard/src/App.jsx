@@ -306,6 +306,68 @@ function SectionHead({ index, label, title }) {
   );
 }
 
+function mapReportToFindings(reportData) {
+  if (!reportData || !reportData.scan || !reportData.scan.findings) return null;
+  return reportData.scan.findings.map((f, i) => {
+    const patch = f.patch;
+    const val = patch?.validation;
+    const conf = val?.confidence_score ? val.confidence_score / 100 : (patch?.success ? 0.85 : 0);
+    const status = !patch ? "NO PATCH" : (val?.passed ? (conf >= 0.8 ? "VALIDATED" : "REVIEW") : "REJECTED");
+
+    const beforeLines = patch?.original_code
+      ? patch.original_code.split("\n")
+      : (f.context?.surrounding_lines
+          ? f.context.surrounding_lines.split("\n")
+          : [f.code_snippet || ""]);
+
+    const afterLines = patch?.patched_code
+      ? patch.patched_code.split("\n")
+      : ["# No patch generated (run scanner with --fix)"];
+
+    const diff = [];
+    if (patch?.original_code && patch?.patched_code) {
+      patch.original_code.split("\n").forEach((l) => diff.push({ t: "del", x: l }));
+      patch.patched_code.split("\n").forEach((l) => diff.push({ t: "add", x: l }));
+    } else {
+      diff.push({ t: "del", x: f.code_snippet || "Vulnerable expression" });
+      if (patch?.patched_code) {
+        patch.patched_code.split("\n").forEach((l) => diff.push({ t: "add", x: l }));
+      }
+    }
+
+    const checks = val ? [
+      ["Syntax validation", val.syntax_valid ? "pass" : "fail"],
+      ["AST logic preservation", val.logic_preserved ? "pass" : "fail"],
+      ["Vulnerability re-scan", val.vuln_fixed ? "pass" : "fail"],
+      ["No new vulnerabilities", val.no_new_vulns ? "pass" : "fail"],
+      ["Decision", val.passed ? "pass" : "warn"]
+    ] : [
+      ["Syntax validation", "warn"],
+      ["AST logic preservation", "warn"],
+      ["Vulnerability re-scan", "warn"],
+      ["No new vulnerabilities", "warn"],
+      ["Status", "fail"]
+    ];
+
+    return {
+      id: `SP-${String(i + 1).padStart(3, "0")}`,
+      sev: (f.severity || "INFO").toUpperCase(),
+      cwe: f.cwe_id || "CWE",
+      title: f.vuln_type || "Vulnerability",
+      file: f.file_path || "examples/vulnerable.py",
+      line: f.line_number || 1,
+      conf: conf,
+      status: status,
+      rule: f.rule_id || "SEC000",
+      flow: f.context?.data_flow || f.description || "Taint source to sink",
+      before: beforeLines,
+      after: afterLines,
+      diff: diff,
+      checks: checks
+    };
+  });
+}
+
 /* ---- App ---- */
 export default function App() {
   const prm  = usePRM();
@@ -313,9 +375,74 @@ export default function App() {
   const [sel,    setSel]    = useState(0);
   const [mode,   setMode]   = useState("diff");
   const [filter, setFilter] = useState("ALL");
-  const f = FINDINGS[sel];
+  const [reportSource, setReportSource] = useState("live");
+  const [liveFindings, setLiveFindings] = useState(null);
+  const [liveSummary, setLiveSummary] = useState(null);
+  const [loadedFileName, setLoadedFileName] = useState("examples/vulnerable.py");
+  const fileInputRef = useRef(null);
 
-  const shown = FINDINGS.filter((x) => filter === "ALL" || x.sev === filter);
+  // Load latest scan report on mount
+  useEffect(() => {
+    fetch("/reports/securepy-ai-report.json")
+      .then((res) => {
+        if (!res.ok) throw new Error("Report not found");
+        return res.json();
+      })
+      .then((data) => {
+        const mapped = mapReportToFindings(data);
+        if (mapped && mapped.length > 0) {
+          setLiveFindings(mapped);
+          setLiveSummary(data.summary);
+          setLoadedFileName(data.target || "examples/vulnerable.py");
+          setReportSource("live");
+        }
+      })
+      .catch(() => {
+        setReportSource("demo");
+      });
+  }, []);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        const mapped = mapReportToFindings(data);
+        if (mapped && mapped.length > 0) {
+          setLiveFindings(mapped);
+          setLiveSummary(data.summary);
+          setLoadedFileName(file.name);
+          setReportSource("live");
+          setSel(0);
+        }
+      } catch (err) {
+        alert("Invalid SecurePy AI JSON report file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const activeFindings = (reportSource === "live" && liveFindings) ? liveFindings : FINDINGS;
+  const safeSel = Math.min(sel, activeFindings.length - 1);
+  const f = activeFindings[safeSel] || activeFindings[0] || FINDINGS[0];
+
+  const shown = activeFindings.filter((x) => filter === "ALL" || x.sev === filter);
+
+  const stats = (reportSource === "live" && liveSummary) ? {
+    files: liveSummary.files_scanned || 1,
+    findings: liveSummary.total_findings || activeFindings.length,
+    patches: liveSummary.patch_stats?.generated || 0,
+    validated: liveSummary.patch_stats?.valid || 0,
+    topConf: activeFindings.length > 0 ? Math.round(Math.max(...activeFindings.map(x => x.conf)) * 100) : 0
+  } : {
+    files: 24,
+    findings: 4,
+    patches: 4,
+    validated: 2,
+    topConf: 93
+  };
 
   return (
     <div className="sy-root">
@@ -324,9 +451,9 @@ export default function App() {
       {/* ── status bar ── */}
       <div className="sy-status" role="status" aria-label="System status">
         <span className="sy-status-item"><span className="sy-live" aria-hidden="true" />ollama · connected</span>
-        <span className="sy-status-item">model <b>codellama:13b</b></span>
+        <span className="sy-status-item">target <b>{reportSource === "live" ? loadedFileName : "examples/vulnerable.py"}</b></span>
         <span className="sy-status-item hide-s">build <b>v1.0.0</b></span>
-        <span className="sy-status-item hide-s">phase <b>9 / 24</b></span>
+        <span className="sy-status-item hide-s">source <b>{reportSource === "live" ? "LIVE SCAN" : "DEMO DATA"}</b></span>
         <span className="sy-status-item sy-right">local · code never leaves host</span>
       </div>
 
@@ -342,7 +469,26 @@ export default function App() {
           <a href="#research">research</a>
           <a href="#roadmap">roadmap</a>
         </nav>
-        <a className="sy-cta" href="#console" aria-label="Jump to live scan console">run_scan --fix</a>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            accept=".json"
+            onChange={handleFileUpload}
+          />
+          <button
+            className="sy-fbtn"
+            style={{ padding: "6px 12px", fontSize: "11px" }}
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload any securepy-ai-report.json"
+          >
+            Upload JSON
+          </button>
+          <a className="sy-cta" href="#console" aria-label="Jump to live scan console">
+            view_findings ({activeFindings.length})
+          </a>
+        </div>
       </header>
 
       {/* ── hero: editorial + live terminal ── */}
@@ -361,7 +507,7 @@ export default function App() {
             not noise.
           </p>
           <div className="sy-open-meta" role="list" aria-label="Feature highlights">
-            <span className="sy-chip" role="listitem">9 phases shipped</span>
+            <span className="sy-chip" role="listitem">{stats.findings} findings detected</span>
             <span className="sy-chip" role="listitem">5 CWE engines</span>
             <span className="sy-chip" role="listitem">3 report formats</span>
             <span className="sy-chip sy-chip-g" role="listitem">privacy-first</span>
@@ -370,11 +516,11 @@ export default function App() {
         <div className="sy-open-right">
           <Terminal />
           <div className="sy-open-strip" aria-label="Scan statistics">
-            <div><CountUp to={24} /> <i>files</i></div>
-            <div><CountUp to={4} /> <i>findings</i></div>
-            <div><CountUp to={4} /> <i>patches</i></div>
-            <div><CountUp to={2} /> <i>validated</i></div>
-            <div><CountUp to={93} suffix="%" /> <i>top conf.</i></div>
+            <div><CountUp to={stats.files} /> <i>files</i></div>
+            <div><CountUp to={stats.findings} /> <i>findings</i></div>
+            <div><CountUp to={stats.patches} /> <i>patches</i></div>
+            <div><CountUp to={stats.validated} /> <i>validated</i></div>
+            <div><CountUp to={stats.topConf} suffix="%" /> <i>top conf.</i></div>
           </div>
         </div>
       </section>
@@ -441,10 +587,10 @@ export default function App() {
         <div className="sy-console">
           <div className="sy-clist" role="listbox" aria-label="Security findings">
             {shown.map((x) => {
-              const real = FINDINGS.indexOf(x);
+              const real = activeFindings.indexOf(x);
               return (
                 <button key={x.id}
-                  className={"sy-crow" + (sel === real ? " on" : "")}
+                  className={"sy-crow" + (safeSel === real ? " on" : "")}
                   onClick={() => setSel(real)}
                   role="option"
                   aria-selected={sel === real}

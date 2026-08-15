@@ -103,6 +103,14 @@ class PatchValidator:
             decision=decision,
         )
 
+    def validate_report(self, report) -> None:
+        """
+        Validates all generated patches in a ScanReport in-place.
+        """
+        for finding in report.findings:
+            if finding.patch and finding.patch.success and finding.patch.validation is None:
+                finding.patch.validation = self.validate(finding, finding.patch)
+
     # ------------------------------------------------------------------
     # Internal checks
     # ------------------------------------------------------------------

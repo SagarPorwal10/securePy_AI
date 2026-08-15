@@ -1,0 +1,58 @@
+name: SecurePy AI Security Scan
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - phase-9-test
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  securepy-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run SecurePy AI
+        id: securepy
+        uses: ./
+        continue-on-error: true
+        with:
+          target: "."
+          fail_on: high
+          report: all
+          output_dir: reports
+          diff_only: false
+          enable_fix: off
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SecurePy AI reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securepy-reports
+          path: reports/
+          if-no-files-found: ignore
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/securepy-ai-report.sarif
+        continue-on-error: true
+
+      - name: Fail build based on SecurePy AI exit code
+        if: steps.securepy.outputs.exit_code == '1'
+        run: |
+          echo "::error::SecurePy AI detected blocking vulnerabilities."
+          exit 1

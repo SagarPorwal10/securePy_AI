@@ -520,15 +520,13 @@ export default function App() {
       <section className="sy-sec sy-research" id="research" aria-labelledby="research-heading">
         <div className="sy-res-grid">
           <div className="sy-res-sticky">
-            {/*
-              IMAGE SLOT A — fig. 01
-              Current: procedurally generated SVG AST tree (no static image needed).
-              Optional upgrade: replace <ASTTree /> with:
-                <img src="/images/ast-diagram.png" alt="Abstract Syntax Tree with flagged vulnerability nodes"
-                     width="400" height="320" loading="lazy" />
-              See: images_required.txt for details.
-            */}
-            <ASTTree />
+            {/* IMAGE SLOT A — real AST diagram photo */}
+            <img
+              src="/images/ast-diagram.jpg"
+              alt="Abstract Syntax Tree with flagged vulnerability sinks (SQL SINK, CMD SINK, EXEC SINK highlighted in red)"
+              style={{ width: '100%', display: 'block', borderRadius: 0 }}
+              loading="lazy"
+            />
             <div className="sy-res-cap">fig. 01 — abstract syntax tree with flagged sinks</div>
           </div>
           <div className="sy-res-body">
@@ -582,15 +580,15 @@ export default function App() {
 
       <footer className="sy-foot">
         <div className="sy-foot-l">
-          {/*
-            IMAGE SLOT B — footer logo
-            Current: inline SVG shield icon (no static image needed).
-            Optional upgrade: use the generated logo.jpg:
-              <img src="/logo.jpg" alt="SecurePy AI logo" width="32" height="32"
-                   style={{borderRadius:'4px'}} loading="lazy" />
-            See: images_required.txt for details.
-          */}
-          <Logo />
+          {/* IMAGE SLOT B — real logo photo */}
+          <img
+            src="/logo.jpg"
+            alt="SecurePy AI logo"
+            width="36"
+            height="36"
+            style={{ borderRadius: '4px', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+          />
           <div>
             <div className="sy-word">SecurePy<span className="sy-word-ai">_AI</span></div>
             <div className="sy-foot-sub">Sagar Porwal · National Forensic Sciences University, Delhi</div>

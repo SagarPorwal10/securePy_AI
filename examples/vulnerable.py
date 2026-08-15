@@ -8,7 +8,10 @@ import yaml
 def securepy_mock_fix():
     # Replace with validated secure implementation.
     return None
-api_key = "AKIA923848239482394"
+# SecurePy AI mock patch
+def securepy_mock_fix():
+    # Replace with validated secure implementation.
+    return None
 db_secret = "supersecret123"
 
 username = "sagar"

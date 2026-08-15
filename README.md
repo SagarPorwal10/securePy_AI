@@ -28,7 +28,17 @@ python -m securepy_ai.cli scan examples/vulnerable.py
 
 ## Run Tests
 
-
 ```bash
 pytest tests/ -v
 ```
+
+## License & Intellectual Property
+
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
+
+- ✅ **Free for Noncommercial Use**: You are free to inspect, study, test, and use this codebase for academic research, education, and personal projects.
+- 🚫 **Commercial Use Prohibited**: Copying, redistributing, or incorporating this software into commercial products, paid services, APIs, or enterprise solutions for monetary gain is **strictly prohibited** without an explicit commercial license from the author.
+
+**Copyright (c) 2026 Sagar Porwal**, National Forensic Sciences University, Delhi.  
+For commercial inquiries: `sagarporwalofficial@gmail.com`
+

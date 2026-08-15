@@ -1,0 +1,63 @@
+PolyForm Noncommercial License 1.0.0
+
+Copyright (c) 2026 Sagar Porwal, National Forensic Sciences University, Delhi.
+
+https://polyformproject.org/licenses/noncommercial/1.0.0/
+
+================================================================================
+TERMS AND CONDITIONS
+================================================================================
+
+1. Purpose
+This license allows you to use, copy, modify, run, and share this software for
+noncommercial purposes only. Commercial use, monetization, or incorporation into
+commercial products/services is strictly prohibited without explicit written
+permission from the copyright holder.
+
+2. Grant of Rights
+Subject to the terms and conditions of this license, the copyright holder grants
+you a worldwide, royalty-free, non-exclusive, non-sublicensable license to:
+  (a) Reproduce and distribute copies of the software.
+  (b) Prepare derivative works based upon the software.
+  (c) Run and execute the software.
+
+3. Noncommercial Purpose Limitation
+You may only use the software for Noncommercial Purposes. "Noncommercial Purpose"
+means any purpose that is not primarily intended for or directed towards
+commercial advantage or monetary compensation.
+
+Examples of permitted uses:
+  - Personal use and experimentation
+  - Academic, educational, and scientific research
+  - Noncommercial teaching and classroom demonstration
+  - Security evaluations of open-source projects
+
+Examples of prohibited uses without a separate commercial license:
+  - Selling the software or derivative works
+  - Offering the software as a paid SaaS, API, or managed service
+  - Using the software internally within a for-profit commercial entity
+  - Bundling the software with commercial products or enterprise tools
+
+4. Attribution and Notices
+You must retain the copyright notice above and include a copy of this license
+in all copies or substantial portions of the software or derivative works.
+
+5. Commercial Inquiries
+For commercial licensing, enterprise deployment, or proprietary redistribution,
+contact the author:
+  Author: Sagar Porwal
+  Institution: National Forensic Sciences University, Delhi
+  GitHub: https://github.com/SagarPorwal10
+  Email: sagarporwalofficial@gmail.com
+
+================================================================================
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+================================================================================

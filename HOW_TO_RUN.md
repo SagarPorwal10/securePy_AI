@@ -1,6 +1,6 @@
 # How to Run SecurePy AI
 
-This guide explains how to set up, activate, and run **SecurePy AI** on your machine.
+This guide explains how to set up, activate, and run **SecurePy AI** on your machine — locally and in CI/CD.
 
 ---
 
@@ -122,7 +122,204 @@ python -m securepy_ai.cli scan examples/vulnerable.py --fix --model qwen2.5-code
 | `--ollama-url` | `http://127.0.0.1:11434` | Ollama server URL |
 | `--timeout` | `180` | Request timeout in seconds |
 | `--max-patches` | `3` | Max number of patches to generate |
-| `--no-validate` | off | Skip Phase 6 patch validation (faster) |
+| `--skip-validation` | off | Skip Phase 6 patch validation (faster) |
+
+---
+
+## 📄 Report Generation (Phase 7)
+
+SecurePy AI can export findings in **JSON**, **HTML**, and **SARIF** formats.
+
+### Generate all report formats at once
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --report all --output-dir reports
+```
+
+### Generate a specific format
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --report json --output-dir reports
+python -m securepy_ai.cli scan examples/vulnerable.py --report html --output-dir reports
+python -m securepy_ai.cli scan examples/vulnerable.py --report sarif --output-dir reports
+```
+
+Reports are saved to:
+```text
+reports/securepy-ai-report.json
+reports/securepy-ai-report.html
+reports/securepy-ai-report.sarif
+```
+
+### Full pipeline with reports + AI patches
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --report all --output-dir reports
+```
+
+---
+
+## 📊 Output Formats & Severity Gate (Phase 8)
+
+### Quiet mode — CI-friendly one-liner output
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --quiet
+```
+Output:
+```text
+files_scanned=1 findings=10 baseline_ignored=0 errors=0 patches_generated=0 valid_patches=0 exit_code=1
+```
+
+### JSON output — machine-readable
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --format json
+```
+
+### Control when the build fails with `--fail-on`
+```powershell
+# Fail only on Critical findings
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on critical
+
+# Fail on High and above (default)
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on high
+
+# Never fail (useful for reporting only)
+python -m securepy_ai.cli scan examples/vulnerable.py --fail-on none
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | No findings at or above the `--fail-on` threshold |
+| `1` | Blocking findings found |
+| `2` | Scanner error (e.g. Ollama unreachable) |
+
+---
+
+## 🔖 Baseline — Ignore Known Findings (Phase 8)
+
+Baselines let CI ignore pre-existing findings so only **new** vulnerabilities block the build.
+
+### Create a baseline from current findings
+```powershell
+python -m securepy_ai.cli scan . --create-baseline baseline.json --fail-on none
+```
+
+### Scan using a baseline (only new findings are reported)
+```powershell
+python -m securepy_ai.cli scan . --baseline baseline.json --fail-on high
+```
+
+Commit the baseline so CI always has it:
+```powershell
+git add baseline.json
+git commit -m "chore: add SecurePy AI baseline"
+```
+
+---
+
+## 🤖 GitHub Action / CI/CD (Phase 9)
+
+SecurePy AI ships as a **Docker-based GitHub Action** — drop it into any repository with a few lines of YAML.
+
+### Minimal workflow setup
+
+Add `.github/workflows/securepy-ai.yml` to your repo:
+```yaml
+name: SecurePy AI Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  securepy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run SecurePy AI
+        id: securepy
+        uses: ./
+        continue-on-error: true
+        with:
+          target: "."
+          fail_on: high
+          report: all
+          output_dir: reports
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: securepy-reports
+          path: reports/
+
+      - name: Fail on blocking findings
+        if: steps.securepy.outputs.exit_code == '1'
+        run: exit 1
+```
+
+### Action inputs reference
+
+| Input | Default | Description |
+|---|---|---|
+| `target` | `.` | File or directory to scan |
+| `fail_on` | `high` | Severity gate: `critical`, `high`, `medium`, `low`, `info`, `none` |
+| `report` | `all` | Report type: `json`, `html`, `sarif`, `all` |
+| `output_dir` | `reports` | Directory to store reports |
+| `baseline` | _(empty)_ | Path to baseline JSON file |
+| `diff_only` | `false` | Scan only Python files changed in the PR |
+| `enable_fix` | `off` | AI patches: `off`, `mock`, `ollama` |
+| `model` | `codellama:13b` | Ollama model (when `enable_fix=ollama`) |
+| `ollama_url` | `http://127.0.0.1:11434` | Ollama server URL |
+| `max_patches` | `3` | Max patches to generate |
+| `github_token` | _(empty)_ | Token for posting PR comments |
+
+### Diff-only scanning (faster CI)
+Only scan Python files that changed in the pull request:
+```yaml
+        with:
+          diff_only: true
+```
+
+### Enable mock AI patches in CI (no Ollama needed)
+Useful for demos and college presentations:
+```yaml
+        with:
+          enable_fix: mock
+          max_patches: 3
+```
+
+### Generate PR comment locally
+Test the PR comment script against an existing report:
+```powershell
+python scripts/pr_comment.py reports/securepy-ai-report.json
+```
+
+Expected output:
+```markdown
+## 🛡️ SecurePy AI Security Scan
+
+### Scan Summary
+
+| Metric | Value |
+|---|---:|
+| Files scanned | 1 |
+| Total findings | 10 |
+...
+```
+
+### Diff-only scan from the CLI (Phase 9 feature)
+Scan a specific list of files (used internally by the Action in diff-only mode):
+```powershell
+# PowerShell — pass a JSON array of file paths
+python -m securepy_ai.cli scan --files-from-json '["examples/vulnerable.py"]' --fail-on high
+```
 
 ---
 
@@ -148,9 +345,39 @@ python -m securepy_ai.cli scan examples/vulnerable.py --show-prompts --max-promp
 python -m securepy_ai.cli scan examples/vulnerable.py --context --show-prompts --fix --mock-llm --max-patches 2
 ```
 
+### Phase 7 — Full pipeline with all reports
+```powershell
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --report all --output-dir reports
+```
+
+### Phase 8 — CI-friendly quiet mode with severity gate
+```powershell
+python -m securepy_ai.cli scan . --quiet --fail-on high --report all --output-dir reports
+```
+
+### Phase 8 — Scan with baseline (new findings only)
+```powershell
+python -m securepy_ai.cli scan . --baseline baseline.json --fail-on high --quiet
+```
+
+### Phase 9 — Test CI entrypoint locally (Linux/macOS/WSL)
+```bash
+export GITHUB_WORKSPACE="$(pwd)"
+export INPUT_TARGET="examples/vulnerable.py"
+export INPUT_FAIL_ON="high"
+export INPUT_REPORT="all"
+export INPUT_OUTPUT_DIR="reports"
+export INPUT_BASELINE=""
+export INPUT_DIFF_ONLY="false"
+export INPUT_ENABLE_FIX="off"
+export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
+
+bash action/entrypoint.sh
+```
+
 ### Skip validation (speed test / offline comparison)
 ```powershell
-python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --no-validate
+python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --skip-validation
 ```
 
 ---
@@ -223,3 +450,20 @@ py -m securepy_ai.cli scan examples/vulnerable.py
 ### Patch shows `[FAIL]` validation
 **Cause**: The LLM didn't fully fix the vulnerability, or introduced a new one.  
 **Fix**: This is expected behaviour — it shows Phase 6 validation is working. Try a stronger model or `--max-patches` with a higher limit to generate more attempts.
+
+### GitHub Action fails with `permission denied` on entrypoint.sh
+**Cause**: The shell script lost its executable bit during `git add`.  
+**Fix**: Run once before pushing:
+```bash
+git update-index --chmod=+x action/entrypoint.sh scripts/pr_comment.py
+git commit -m "fix: mark shell scripts as executable"
+```
+
+### GitHub Action: PR comment not posted
+**Cause**: `github_token` input is missing or the workflow lacks `pull-requests: write` permission.  
+**Fix**: Ensure the workflow has:
+```yaml
+permissions:
+  pull-requests: write
+```
+and the step passes `github_token: ${{ secrets.GITHUB_TOKEN }}`.

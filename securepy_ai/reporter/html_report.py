@@ -128,7 +128,7 @@ def _summary_cards(summary: dict) -> str:
         ("Files Scanned",        summary["files_scanned"]),
         ("Total Findings",       summary["total_findings"]),
         ("Patches Generated",    summary["patch_stats"]["generated"]),
-        ("Auto Apply",           summary["patch_stats"]["valid"]),
+        ("Auto Apply",           summary["patch_stats"]["auto_apply"]),
         ("Review Needed",        summary["patch_stats"]["review"]),
         ("Rejected",             summary["patch_stats"]["rejected"]),
         ("Avg Confidence",       summary["average_patch_confidence"]),

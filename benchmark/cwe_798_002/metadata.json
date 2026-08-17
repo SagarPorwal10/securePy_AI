@@ -1,0 +1,7 @@
+{
+  "id": "cwe798_002",
+  "cwe": "CWE-798",
+  "rule_id": "SEC101",
+  "severity": "High",
+  "vuln_type": "Hardcoded Secret"
+}

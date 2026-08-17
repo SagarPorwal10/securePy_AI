@@ -63,7 +63,9 @@ def test_patch_generator_with_mock_llm():
     assert patch.model == "mock-llm"
     assert patch.latency_ms >= 0
     assert is_valid_python(patch.patched_code)
-    assert "securepy_mock_fix" in patch.patched_code
+    # SEC102 mock patch returns a parameterised query fix
+    assert "cursor.execute" in patch.patched_code
+
 
 
 def test_prompt_contains_finding_details():

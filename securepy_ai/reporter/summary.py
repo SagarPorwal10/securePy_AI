@@ -29,7 +29,7 @@ def build_summary(report: ScanReport) -> Dict[str, Any]:
         "generated": 0,
         "success": 0,
         "failed": 0,
-        "valid": 0,
+        "auto_apply": 0,
         "review": 0,
         "rejected": 0,
     }
@@ -62,7 +62,7 @@ def build_summary(report: ScanReport) -> Dict[str, Any]:
 
         if patch.validation.passed:
             if patch.validation.decision.startswith("Auto Apply"):
-                patch_stats["valid"] += 1
+                patch_stats["auto_apply"] += 1
             else:
                 patch_stats["review"] += 1
         else:

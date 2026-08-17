@@ -1,5 +1,10 @@
 import ast
+import contextlib
+import hashlib
+import tempfile
+from pathlib import Path
 from typing import List
+
 
 from securepy_ai.models import (
     PatchCandidate,
@@ -32,22 +37,22 @@ class PatchValidator:
 
     Phase 6 introduces four validation checks:
 
-        1. Syntax validation   — patched code must parse as valid Python.
-        2. Logic preservation  — original function/class names must be
+        1. Syntax validation   â€” patched code must parse as valid Python.
+        2. Logic preservation  â€” original function/class names must be
                                   present in the patch (structural check).
-        3. Vuln fixed          — the rule that triggered the original
+        3. Vuln fixed          â€” the rule that triggered the original
                                   finding must NOT fire on the patched code
                                   at the same line.
-        4. No new vulns        — no other rules may fire on the patched
+        4. No new vulns        â€” no other rules may fire on the patched
                                   code that were not already present before
                                   the patch.
 
-    Confidence score (0–100):
+    Confidence score (0â€“100):
 
-        syntax_valid    → +30
-        logic_preserved → +20
-        vuln_fixed      → +30
-        no_new_vulns    → +20
+        syntax_valid    â†’ +30
+        logic_preserved â†’ +20
+        vuln_fixed      â†’ +30
+        no_new_vulns    â†’ +20
 
     A patch passes when confidence_score >= 60.
     """
@@ -129,7 +134,7 @@ class PatchValidator:
             ast.parse(code)
             return True
         except SyntaxError as exc:
-            errors.append(f"Syntax check: SyntaxError — {exc.msg} (line {exc.lineno})")
+            errors.append(f"Syntax check: SyntaxError â€” {exc.msg} (line {exc.lineno})")
             return False
 
     def _check_logic_preserved(
@@ -154,7 +159,7 @@ class PatchValidator:
         original_names = self._extract_definition_names(original_code)
 
         if not original_names:
-            # Nothing to compare — pass.
+            # Nothing to compare â€” pass.
             return True
 
         if not patched_code or not patched_code.strip():
@@ -202,20 +207,17 @@ class PatchValidator:
             return False
 
         try:
-            patch_report = self._scanner.scan_path(
-                self._code_to_tempfile(patched_code)
-            )
+            with self._scan_code_string(patched_code) as patch_report:
+                for patch_finding in patch_report.findings:
+                    if patch_finding.rule_id == finding.rule_id:
+                        errors.append(
+                            f"Vuln-fixed check: rule '{finding.rule_id}' still "
+                            "fires on the patched code — vulnerability not fixed."
+                        )
+                        return False
         except Exception as exc:
             errors.append(f"Vuln-fixed check: scan error — {exc}")
             return False
-
-        for patch_finding in patch_report.findings:
-            if patch_finding.rule_id == finding.rule_id:
-                errors.append(
-                    f"Vuln-fixed check: rule '{finding.rule_id}' still "
-                    "fires on the patched code — vulnerability not fixed."
-                )
-                return False
 
         return True
 
@@ -237,18 +239,16 @@ class PatchValidator:
             # Already flagged by other checks; pass silently here.
             return True
 
+        new_findings = []
         try:
-            patch_report = self._scanner.scan_path(
-                self._code_to_tempfile(patched_code)
-            )
+            with self._scan_code_string(patched_code) as patch_report:
+                new_findings = [
+                    f for f in patch_report.findings
+                    if f.rule_id != finding.rule_id
+                ]
         except Exception as exc:
             errors.append(f"New-vuln check: scan error — {exc}")
             return False
-
-        new_findings = [
-            f for f in patch_report.findings
-            if f.rule_id != finding.rule_id
-        ]
 
         if new_findings:
             new_rules = sorted({f.rule_id for f in new_findings})
@@ -259,6 +259,7 @@ class PatchValidator:
             return False
 
         return True
+
 
     # ------------------------------------------------------------------
     # Helpers
@@ -273,7 +274,7 @@ class PatchValidator:
         no_new_vulns: bool,
     ) -> float:
         """
-        Computes the confidence score (0–100) from the check results.
+        Computes the confidence score (0â€“100) from the check results.
         """
         score = 0.0
 
@@ -300,9 +301,9 @@ class PatchValidator:
         Routes a patch to a decision label based on validation outcomes.
 
         Decisions:
-            Auto Apply Recommended       — score ≥ 90, all critical checks pass
-            Developer Review Recommended — score ≥ 60, vuln fixed, no new vulns
-            Reject / Manual Remediation  — anything else
+            Auto Apply Recommended       â€” score â‰¥ 90, all critical checks pass
+            Developer Review Recommended â€” score â‰¥ 60, vuln fixed, no new vulns
+            Reject / Manual Remediation  â€” anything else
         """
         if not syntax_valid or not vuln_fixed or not no_new_vulns:
             return "Reject / Manual Remediation"
@@ -337,27 +338,25 @@ class PatchValidator:
 
         return names
 
-    @staticmethod
-    def _code_to_tempfile(code: str) -> str:
+    @contextlib.contextmanager
+    def _scan_code_string(self, code: str):
         """
-        Writes *code* to a temporary .py file on disk and returns its path.
+        Context manager that writes *code* to a temporary .py file,
+        scans it, yields the ScanReport, then **always** deletes the
+        temp file — even if an exception occurs.
 
-        The temporary file is written to the system temp directory with a
-        unique name so the scanner (which operates on file paths) can read
-        it.  The file is not cleaned up immediately — it will be removed
-        by the OS on the next temp-directory cleanup cycle.
-
-        A deterministic (hash-based) filename is used so that repeated
-        calls with the same code reuse the same path, avoiding runaway
-        temp-file accumulation during large scans.
+        A deterministic (hash-based) filename avoids creating duplicate
+        files when the same code is scanned multiple times in one run.
         """
-        import hashlib
-        import tempfile
-        from pathlib import Path
-
         code_hash = hashlib.md5(code.encode("utf-8")).hexdigest()[:12]
         tmp_path = Path(tempfile.gettempdir()) / f"securepy_patch_{code_hash}.py"
 
-        tmp_path.write_text(code, encoding="utf-8")
-
-        return str(tmp_path)
+        try:
+            tmp_path.write_text(code, encoding="utf-8")
+            report = self._scanner.scan_path(str(tmp_path))
+            yield report
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass

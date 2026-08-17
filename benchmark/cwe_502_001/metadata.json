@@ -1,0 +1,7 @@
+{
+  "id": "cwe502_001",
+  "cwe": "CWE-502",
+  "rule_id": "SEC104",
+  "severity": "High",
+  "vuln_type": "Insecure Deserialization"
+}

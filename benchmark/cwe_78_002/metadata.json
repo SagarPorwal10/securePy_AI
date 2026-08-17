@@ -1,0 +1,7 @@
+{
+  "id": "cwe78_002",
+  "cwe": "CWE-78",
+  "rule_id": "SEC103",
+  "severity": "High",
+  "vuln_type": "Command Injection"
+}

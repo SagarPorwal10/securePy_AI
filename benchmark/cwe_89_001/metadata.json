@@ -1,0 +1,7 @@
+{
+  "id": "cwe89_001",
+  "cwe": "CWE-89",
+  "rule_id": "SEC102",
+  "severity": "Critical",
+  "vuln_type": "SQL Injection"
+}

@@ -48,6 +48,8 @@ def _load_dotenv(dotenv_path: pathlib.Path) -> dict:
     Supports:
       - KEY=VALUE
       - KEY="VALUE"  /  KEY='VALUE'
+      - export KEY=VALUE   (bash-style)
+      - KEY=value # inline comment
       - # comment lines
       - blank lines
     """
@@ -60,21 +62,35 @@ def _load_dotenv(dotenv_path: pathlib.Path) -> dict:
         for raw_line in fh:
             line = raw_line.strip()
 
-            # skip blanks and comments
+            # skip blanks and comment lines
             if not line or line.startswith("#"):
                 continue
+
+            # strip optional leading "export " prefix
+            if line.startswith("export "):
+                line = line[len("export "):].strip()
 
             if "=" not in line:
                 continue
 
             key, _, value = line.partition("=")
             key = key.strip()
-            value = value.strip().strip('"').strip("'")
+            value = value.strip()
+
+            # strip surrounding quotes (single or double)
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                value = value[1:-1]
+            else:
+                # strip inline comment: value # comment
+                # only strip when not inside quotes
+                if " #" in value:
+                    value = value[:value.index(" #")].strip()
 
             if key:
                 env[key] = value
 
     return env
+
 
 
 def _find_dotenv() -> pathlib.Path:

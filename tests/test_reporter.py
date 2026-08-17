@@ -120,7 +120,7 @@ def test_summary_patch_stats_auto_apply():
 
     assert summary["patch_stats"]["generated"] == 1
     assert summary["patch_stats"]["success"] == 1
-    assert summary["patch_stats"]["valid"] == 1
+    assert summary["patch_stats"]["auto_apply"] == 1
     assert summary["patch_stats"]["review"] == 0
     assert summary["patch_stats"]["rejected"] == 0
 
@@ -130,7 +130,7 @@ def test_summary_patch_stats_rejected():
     summary = build_summary(report)
 
     assert summary["patch_stats"]["rejected"] == 1
-    assert summary["patch_stats"]["valid"] == 0
+    assert summary["patch_stats"]["auto_apply"] == 0
 
 
 def test_summary_average_confidence():

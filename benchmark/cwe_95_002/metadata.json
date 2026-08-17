@@ -1,0 +1,7 @@
+{
+  "id": "cwe95_002",
+  "cwe": "CWE-95",
+  "rule_id": "SEC105",
+  "severity": "High",
+  "vuln_type": "Unsafe Dynamic Execution"
+}

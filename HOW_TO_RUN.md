@@ -1,6 +1,6 @@
 # How to Run SecurePy AI — Complete Guide
 
-Covers everything built so far: **Phases 1–9 (engine + CI)**, **Phase 10–10.4 (live dashboard + remediation)**, **Phase 10.5 (Issue Store)**, and **Phase 11 (benchmarking)**.
+Covers everything built so far: **Phases 1–9 (engine + CI)**, **Phase 10–10.4 (live dashboard + remediation)**, **Phase 10.5 (Issue Store)**, and **Phase 11 (benchmarking, model comparison & context ablation)**.
 
 ---
 
@@ -101,23 +101,53 @@ python -m securepy_ai.cli --version
 ## 📊 Benchmark (Phase 11)
 
 ```powershell
-# 1. Generate the starter dataset (5 cases, one per CWE)
+# 1. Generate the dataset — 10 cases, 2 per CWE (89, 798, 78, 502, 95)
 python scripts/make_benchmark.py
 
-# 2. Run evaluation (offline, no LLM)
+# 2. Offline evaluation — detection + validation + ablation (no LLM needed)
 python -m securepy_ai.cli bench
 
-# 3. Run with the LLM generation track
+# 3. Mock-LLM track (offline, no Ollama)
+python -m securepy_ai.cli bench --llm mock
+
+# 4. Live LLM track (Ollama running)
 python -m securepy_ai.cli bench --llm ollama --model qwen2.5-coder:1.5b
 ```
 
-Options: `--dataset benchmark` · `--llm off|mock|ollama` · `--model …` · `--output reports/benchmark-results.md`
+**`bench` options:**
 
-Outputs: `reports/benchmark-results.md` + `.json` containing:
+| Flag | Default | Description |
+|---|---|---|
+| `--dataset` | `benchmark` | Path to benchmark directory |
+| `--llm` | `off` | `off` \| `mock` \| `ollama` |
+| `--model` | `codellama:13b` | Ollama model name |
+| `--output` | `reports/benchmark-results.md` | Report output path |
+
+**Outputs:** `reports/benchmark-results.md` + `.json` containing:
 - Detection recall & false-positives-on-fixed-code
-- Oracle patch accept rate & original-as-patch rejection
-- Validation-layer ablation (V1 syntax → V4 full)
-- Optional LLM fix-rate / safe-rate / confidence
+- Oracle patch accept rate & original-as-patch rejection rate
+- Validation-layer ablation table (V1 syntax → V4 full security oracle)
+- Optional LLM fix-rate / safe-rate / avg confidence
+
+### Model Comparison + Context Ablation (paper tables)
+
+Requires Ollama with the target models pulled:
+
+```powershell
+# Pull models first (one-time)
+ollama pull qwen2.5-coder:1.5b
+ollama pull deepseek-coder:6.7b
+ollama pull codellama:13b
+
+# Run comparison across all three models + context ablation
+python scripts/compare_models.py
+```
+
+Outputs:
+- `reports/model-comparison.md` — fix rate / safe patch rate / confidence per model
+- `reports/context-ablation.md` — full AST-context prompt vs raw-code-only prompt
+
+> Models not available in Ollama are automatically skipped with `[skip]`.
 
 ---
 
@@ -129,14 +159,17 @@ pytest tests/ -v
 
 | File | Tests |
 |---|---:|
+| test_baseline.py | 4 |
+| test_benchmark.py | 3 |
 | test_context.py | 5 |
 | test_llm.py | 5 |
 | test_patch_validator.py | 17 |
+| test_policies.py | 6 |
 | test_prompt_builder.py | 8 |
+| test_reporter.py | 16 |
 | test_rules.py | 12 |
 | test_scanner.py | 3 |
-| test_benchmark.py | 3 |
-| **Total** | **53** |
+| **Total** | **79** |
 
 ---
 
@@ -251,13 +284,15 @@ bash action/entrypoint.sh
 
 ```powershell
 .venv\Scripts\Activate.ps1
-pytest tests/ -v                                   # 53 passed
-python scripts/make_benchmark.py
-python -m securepy_ai.cli bench                    # evaluation tables
+pytest tests/ -v                                          # 79 passed
+python scripts/make_benchmark.py                          # generate 10-case dataset
+python -m securepy_ai.cli bench                           # offline evaluation + ablation
+python -m securepy_ai.cli bench --llm mock                # with mock LLM track
+python scripts/compare_models.py                          # model comparison + context ablation (needs Ollama)
 python -m securepy_ai.cli scan examples/vulnerable.py --fix --mock-llm --report all
-python server.py                                   # terminal B
+python server.py                                          # terminal B
 # terminal C:
-cd dashboard; npm run dev                          # → http://localhost:5173
+cd dashboard; npm run dev                                 # → http://localhost:5173
 ```
 
 Then in the browser: scan → review → apply/commit → re-scan (auto-verify) → check **issues** queue & trends.

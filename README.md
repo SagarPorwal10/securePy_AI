@@ -1,10 +1,3 @@
-Below is an **updated, publication-ready `README.md`** for your project.
-
-You can directly use this for your GitHub repository, college project, thesis documentation, and paper companion code.
-
----
-
-```md
 # SecurePy AI
 
 ## Context-Aware LLM-Assisted Auto-Remediation of Python Security Vulnerabilities
@@ -690,16 +683,4 @@ GitHub: [github.com/SagarPorwal10](https://github.com/SagarPorwal10)
 
 ## License
 
-This project is intended for academic and research purposes.
-
-```
-
----
-
-If you want, I can next create:
-
-1. **`requirements.txt`**
-2. **`setup.py`**
-3. **Day 1 folder creation script**
-4. **Full GitHub repository file structure**
-5. **A shorter, more professional one-page README**
+This project is intended for academic and research purposes.
